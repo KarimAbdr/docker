@@ -57,16 +57,13 @@ def contain(command, image_name, image_dir, container_id, container_dir):
         image_name, image_dir, container_id, container_dir)
     print('Created a new root fs for our container: {}'.format(new_root))
 
-    # TODO: time to say goodbye to the old mount namespace,
-    #       see "man 2 unshare" to get some help
-    #   HINT 1: there is no os.unshare(), time to use the linux module we made
-    #           just for you!
-    #   HINT 2: the linux module includes both functions and constants!
-    #           e.g. linux.CLONE_NEWNS
+    # Get our own copy of the mount table, separate from the host's.
+    linux.unshare(linux.CLONE_NEWNS)
 
-    # TODO: remember shared subtrees?
-    # (https://www.kernel.org/doc/Documentation/filesystems/sharedsubtree.txt)
-    # Make / a private mount to avoid littering our host mount table.
+    # The copy is still marked "shared" with the host, so new mounts would
+    # still propagate back and forth. Make / (and everything under it,
+    # hence MS_REC) private to break that propagation.
+    linux.mount(None, '/', None, linux.MS_PRIVATE | linux.MS_REC, None)
 
     # Create mounts (/proc, /sys, /dev) under new_root
     linux.mount('proc', os.path.join(new_root, 'proc'), 'proc', 0, '')
