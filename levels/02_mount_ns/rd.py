@@ -18,6 +18,7 @@ import uuid
 
 import click
 import os
+import stat
 import traceback
 
 
@@ -78,7 +79,17 @@ def contain(command, image_name, image_dir, container_id, container_dir):
     for i, dev in enumerate(['stdin', 'stdout', 'stderr']):
         os.symlink('/proc/self/fd/%d' % i, os.path.join(new_root, 'dev', dev))
 
-    # TODO: add more devices (e.g. null, zero, random, urandom) using os.mknod.
+    # Add more devices using os.mknod. major/minor numbers are standard
+    # Linux "memory devices" (major 1), see "man 4 mem" / devices.txt.
+    devices = {
+        'null': (1, 3),
+        'zero': (1, 5),
+        'random': (1, 8),
+        'urandom': (1, 9),
+    }
+    for device, (major, minor) in devices.items():
+        os.mknod(os.path.join(new_root, 'dev', device),
+                 0o666 | stat.S_IFCHR, os.makedev(major, minor))
 
     os.chroot(new_root)
 
