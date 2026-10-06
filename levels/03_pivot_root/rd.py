@@ -40,8 +40,7 @@ def create_container_root(image_name, image_dir, container_id, container_dir):
     if not os.path.exists(container_root):
         os.makedirs(container_root)
 
-    # TODO: uncomment (why?)
-    # linux.mount('tmpfs', container_root, 'tmpfs', 0, None)
+    linux.mount('tmpfs', container_root, 'tmpfs', 0, None) #In real Docker instead of tmpfs using OverlayFS
 
     with tarfile.open(image_path) as t:
         # Fun fact: tar files may contain *nix devices! *facepalm*
@@ -82,7 +81,7 @@ def contain(command, image_name, image_dir, container_id, container_dir):
         raise e
 
     # TODO: we added MS_REC here. wanna guess why?
-    linux.mount(None, '/', None, linux.MS_PRIVATE | linux.MS_REC, None)
+    linux.mount(None, '/', None, linux.MS_PRIVATE | linux.MS_REC, None) # with MS_PRIVATE we ensuring that changes which will be done in a new container/process won't effect on host 
 
     new_root = create_container_root(
         image_name, image_dir, container_id, container_dir)
@@ -102,7 +101,7 @@ def contain(command, image_name, image_dir, container_id, container_dir):
 
     makedev(os.path.join(new_root, 'dev'))
 
-    os.chroot(new_root)  # TODO: replace with pivot_root
+    os.pivot_root(new_root, )  # TODO: replace with pivot_root
 
     os.chdir('/')
 
