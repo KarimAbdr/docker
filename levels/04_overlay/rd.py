@@ -34,25 +34,33 @@ def create_container_root(image_name, image_dir, container_id, container_dir):
     image_path = _get_image_path(image_name, image_dir)
     assert os.path.exists(image_path), "unable to locate image %s" % image_name
 
-    # TODO: Instead of creating the container_root and extracting to it,
-    #       create an images_root.
-    # keep only one rootfs per image and re-use it
-    container_root = _get_container_path(container_id, container_dir, 'rootfs')
+    # The image is shared by all containers: extract it ONCE into
+    # <image_dir>/<image_name>/rootfs and use it as the lowerdir.
+    images_root = os.path.join(image_dir, image_name, 'rootfs')
 
-    if not os.path.exists(container_root):
-        os.makedirs(container_root)
+    if not os.path.exists(images_root):
+        os.makedirs(images_root)
         with tarfile.open(image_path) as t:
             # Fun fact: tar files may contain *nix devices! *facepalm*
             members = [m for m in t.getmembers()
                        if m.type not in (tarfile.CHRTYPE, tarfile.BLKTYPE)]
-            t.extractall(container_root, members=members)
+            t.extractall(images_root, members=members)
 
-    # TODO: create directories for copy-on-write (uppperdir), overlay workdir,
-    #       and a mount point
+    # Each container gets its own: upperdir (its changes), workdir
+    # (overlay's scratch dir) and mount (where the merged view is mounted).
+    upperdir = _get_container_path(container_id, container_dir, 'upperdir')
+    workdir = _get_container_path(container_id, container_dir, 'workdir')
+    mount_point = _get_container_path(container_id, container_dir, 'mount')
+    for d in (upperdir, workdir, mount_point):
+        os.makedirs(d, exist_ok=True)
 
-    # TODO: mount the overlay (HINT: use the MS_NODEV flag to mount)
+    linux.mount(
+        'overlay', mount_point, 'overlay', linux.MS_NODEV,
+        'lowerdir={},upperdir={},workdir={}'.format(
+            images_root, upperdir, workdir))
 
-    return container_root  # return the mountpoint for the mounted overlayfs
+    return mount_point  # return the mountpoint for the mounted overlayfs
+
 
 
 @click.group()
